@@ -4,11 +4,15 @@ import com.postingservice.demo.model.Posting;
 import com.postingservice.demo.model.User;
 import com.postingservice.demo.repo.PostingRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -18,6 +22,9 @@ public class PostingController {
 
     @Autowired
     private PostingRepository postingRepository;
+
+    @Autowired
+    private MongoTemplate mongoTemplate;
 
     @CrossOrigin(origins = "http://localhost:4200")
     @PostMapping("/postings")
@@ -54,9 +61,25 @@ public class PostingController {
     }
 
     @CrossOrigin(origins = "http://localhost:4200")
-    @GetMapping("/postings/{emotion}")
-    public ResponseEntity<List<Posting>> getAllPostings(@PathVariable("emotion") String emotion) {
-        List<Posting> postings = postingRepository.findByEmotion(emotion);
+    @GetMapping("/postings/{searchValue}")
+    public ResponseEntity<List<Posting>> getFilteredPostings(@PathVariable("searchValue") String searchValue) {
+        List<Posting> postings = null;
+
+        if(searchValue.isEmpty()) {
+            postings = postingRepository.findAll();
+        } else {
+            Query query = new Query();
+            List<Criteria> criteriaList = new ArrayList<>();
+            criteriaList.add(Criteria.where("userId").regex(searchValue, "i"));
+            criteriaList.add(Criteria.where("content").regex(searchValue, "i"));
+            criteriaList.add(Criteria.where("emotion").regex(searchValue, "i"));
+            Criteria[] criteriaArray = criteriaList.toArray(new Criteria[criteriaList.size()]);
+            query.addCriteria(new Criteria().orOperator(criteriaArray));
+
+            postings = mongoTemplate.find(query, Posting.class);
+        }
+
+        postings.sort((a,b) -> a.getCreationDate().before(b.getCreationDate()) ? 1 : -1);
         return new ResponseEntity<>(postings, HttpStatus.OK);
     }
 
@@ -67,6 +90,5 @@ public class PostingController {
         Posting newPosting = postingRepository.save(posting);
         return new ResponseEntity<>(newPosting, HttpStatus.CREATED);
     }
-
 
 }
