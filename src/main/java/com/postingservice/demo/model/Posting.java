@@ -3,6 +3,7 @@ package com.postingservice.demo.model;
 import org.springframework.data.annotation.Id;
 
 import java.io.Serializable;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 
 public class Posting implements Serializable {
