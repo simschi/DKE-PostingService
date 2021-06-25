@@ -1,4 +1,4 @@
-package com.postingservice.demo;
+package com.postingservice.demo.controller;
 
 import com.postingservice.demo.model.Posting;
 import com.postingservice.demo.model.User;
@@ -9,9 +9,9 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.*;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -25,6 +25,11 @@ public class PostingController {
 
     @Autowired
     private MongoTemplate mongoTemplate;
+
+    @Autowired
+    private KafkaTemplate<String, Posting> kafkaTemplate;
+
+    private static final String TOPIC = "Kafka_Posting_Topic";
 
     @CrossOrigin(origins = "http://localhost:4200")
     @PostMapping("/postings")
@@ -87,8 +92,18 @@ public class PostingController {
     @PutMapping("/{addPosting}")
     public ResponseEntity<Posting> addPosting(@RequestBody Posting posting) {
         posting.setCreationDate(new Date());
-        Posting newPosting = postingRepository.save(posting);
+        Posting newPosting = postingRepository.insert(posting);
+        sendToKafkaTopic(newPosting);
         return new ResponseEntity<>(newPosting, HttpStatus.CREATED);
+    }
+
+    private boolean sendToKafkaTopic(Posting newPosting) {
+        try {
+            kafkaTemplate.send(TOPIC, newPosting);
+        } catch(Exception e) {
+            return false;
+        }
+        return true;
     }
 
 }
